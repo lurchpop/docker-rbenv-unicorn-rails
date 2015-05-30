@@ -15,5 +15,6 @@ Dockerfile base for rbenv, Ruby on Rails and Unicorn
   - RAILS_ENV passed to init.d script
   - example cascade script
   - create base image so you don't have to wait goddamn 50 years for ruby to build
+  - see if rbenv directory can be shrunken
 
 
