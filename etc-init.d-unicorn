@@ -1,0 +1,104 @@
+#!/bin/bash
+#
+# init.d script for single or multiple unicorn installations.
+#
+# 
+# Modified by jay@gooby.org http://github.com/jaygooby
+# Modified by @lurchpop 
+# based on http://gist.github.com/308216 by http://github.com/mguterl
+#
+## 
+RAILS_ENV="production" # overridden at runtime
+RAILS_ROOT="/mnt/app/railsapp"
+RUNICORN="/usr/local/rbenv/shims/bundle exec /usr/local/rbenv/shims/unicorn_rails"
+RPORT="3000"
+FARG=$1 #copy since it's later shifted out
+
+set -e
+
+sig () {
+  test -s "$PID" && kill -$1 `cat "$PID"`
+}
+
+oldsig () {
+  test -s "$OLD_PID" && kill -$1 `cat "$OLD_PID"`
+}
+
+### pull the flagged options first
+while [[ $# > 1 ]];  do
+  key="$1"
+  shift
+  case $key in
+    -E)
+      RAILS_ENV="$1"
+      shift
+    ;;
+    -p)
+      RPORT="$1"
+      shift
+    ;;
+    *)
+    # unknown option
+    ;;
+  esac
+done
+
+#pulls the standard opts as first argument
+cmd () {
+  case $1 in
+    start)
+      sig 0 && echo >&2 "Already running" && exit 0
+      echo "Starting with: $CMD"
+      $CMD
+      ;;  
+    stop)
+      sig QUIT && echo "Stopping" && exit 0
+      echo >&2 "Not running"
+      ;;  
+    force-stop)
+      sig TERM && echo "Forcing a stop" && exit 0
+      echo >&2 "Not running"
+      forcestop()
+      ;;  
+    restart|reload)
+      sig USR2 && sleep 5 && oldsig QUIT && echo "Killing old master" `cat $OLD_PID` && exit 0
+      echo >&2 "Couldn't reload, starting '$CMD' instead"
+      echo "Starting with: $CMD"
+      $CMD
+      ;;  
+    upgrade)
+      sig USR2 && echo Upgraded && exit 0
+      echo >&2 "Couldn't upgrade, starting '$CMD' instead"
+      echo "Starting with: $CMD"
+      $CMD
+      ;;  
+    rotate)
+            sig USR1 && echo rotated logs OK && exit 0
+            echo >&2 "Couldn't rotate logs" && exit 1
+            ;;  
+    *)  
+      echo >&2 "Usage: $0 <start|stop|restart|upgrade|rotate|force-stop> [-E <environment> [-p <port>]"
+      exit 1
+      ;;  
+    esac
+}
+
+setup () {
+
+  #echo -n "$RAILS_ROOT: "  
+  cd $RAILS_ROOT || exit 1
+  export PID=/tmp/unicorn.pid
+  export OLD_PID="$PID.oldbin"
+
+  CMD="$RUNICORN -c $RAILS_ROOT/config/unicorn.rb -p $RPORT -E $RAILS_ENV -D" 
+  
+}
+
+forcestop () {
+  killall -9 unicorn_rails
+}
+
+setup
+cmd $FARG
+
+
